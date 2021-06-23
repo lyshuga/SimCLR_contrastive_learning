@@ -1,2 +1,1 @@
-# contrastive_learning
-# contrastive_learning
+# SimCLR_contrastive_learning
