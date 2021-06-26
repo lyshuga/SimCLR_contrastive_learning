@@ -263,7 +263,7 @@ def train_simclr(model, dataset, optimizer, criterion,
         
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-
+            model.save('model_joe_no_norm.h5')
     return epoch_wise_loss, model
 
 """## Training"""
@@ -291,4 +291,4 @@ epoch_wise_loss, resnet_simclr  = train_simclr(resnet_simclr_2, train_ds, optimi
 
 #resnet_simclr_2.summary()
 
-resnet_simclr_2.save('model_18.h5')
+
