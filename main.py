@@ -114,7 +114,7 @@ if np.max(train_images) > 2:
 import cv2
 new_images = []
 for i in range(train_images.shape[0]):
-  new_images.append(cv2.resize(train_images[i], (224, 224)))
+  new_images.append(cv2.resize(train_images[i], (256, 256)))
 
 train_images = np.array(new_images)
 print(train_images.shape)
@@ -130,6 +130,30 @@ train_ds = (
 )
 
 
+# class Generator(nn.Module):
+#
+#     def init(self, nb_filters=64, x_dim=48, z_dim=512):
+#
+#         super(Generator, self).__init__()
+#
+#         self.nb_filters = nb_filters
+#
+#         self.from_rgb_96 = EqualConv2d(3, 2 * nb_filters, 1)
+#
+#         self.enc_96 = ConvBlock(2 * nb_filters, 4 * nb_filters, 3, 1, norm=True)
+#         self.enc_48 = ConvBlock(4 * nb_filters, 8 * nb_filters, 3, 1, norm=True)
+#         self.enc_24 = ConvBlock(8 * nb_filters, 8 * nb_filters, 3, 1, norm=True)
+#         self.enc_12 = ConvBlock(8 * nb_filters, 1 * nb_filters, 3, 1, norm=True)
+#
+#         self.encoder = nn.Sequential(self.enc_96, Downsample(),
+#                                      self.enc_48, Downsample(),
+#                                      self.enc_24, Downsample(),
+#                                      self.enc_12, Downsample())
+#
+#         self.x_dim = x_dim
+#
+#         self.proj = nn.Linear(nb_filters * (x_dim // 2  4)
+#         2, z_dim)
 
 """## Utilities"""
 
@@ -139,12 +163,31 @@ from classification_models.tfkeras import Classifiers
 
 
 # Architecture utils
-def get_resnet_simclr(hidden_1, hidden_2, hidden_3):
-    ResNet18, preprocess_input = Classifiers.get('resnet18')
-    base_model =  ResNet18(include_top=False, weights=None, input_shape=(224, 224, 3))
-    base_model.trainable = True
-    inputs = Input((224, 224, 3))
-    h = base_model(inputs, training=True)
+def get_resnet_simclr(hidden_1):
+    # ResNet18, preprocess_input = Classifiers.get('resnet18')
+    # base_model =  ResNet18(include_top=False, weights=None, input_shape=(224, 224, 3))
+    # base_model.trainable = True
+    inputs = Input((256, 256, 3))
+    h = Conv2D(64, 3)(inputs)
+    h = MaxPool2D()(h)
+    h = Conv2D(64, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(128, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(128, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(256, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(256, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(512, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(512, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(1024, 3)(h)
+    h = MaxPool2D()(h)
+    h = Conv2D(1024, 3)(h)
+    h = MaxPool2D()(h)
     h = GlobalAveragePooling2D()(h)
 
     projection_1 = Dense(hidden_1)(h)
@@ -233,7 +276,7 @@ lr_decayed_fn = tf.keras.experimental.CosineDecay(
     initial_learning_rate=0.1, decay_steps=decay_steps)
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)#SGD(lr_decayed_fn)
 
-resnet_simclr_2 = get_resnet_simclr(256, 128, 50)
+resnet_simclr_2 = get_resnet_simclr(256)
 #resnet_simclr_2.load_weights('model.h5')
 
 
