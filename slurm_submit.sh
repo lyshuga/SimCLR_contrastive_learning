@@ -2,11 +2,10 @@
 #SBATCH --job-name=clr
 #SBATCH --output=%x_%j.out
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu
-#SBATCH --mem=670000
-#SBATCH --exclude=ruche-gpu01
+#SBATCH --mem=16000
 
 # Load modules
 unset LD_LIBRARY_PATH

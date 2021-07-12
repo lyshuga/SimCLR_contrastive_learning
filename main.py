@@ -20,7 +20,7 @@ np.random.seed(666)
 
 
 class CustomAugment(object):
-    def __init__(self, sigma=0.05):
+    def __init__(self, sigma=0.25):
         super(CustomAugment, self).__init__()
 
         # M from [1] & https://blog.bham.ac.uk/intellimic/g-landini-software/colour-deconvolution-2/
@@ -31,12 +31,14 @@ class CustomAugment(object):
 
     def __call__(self, sample):        
         # Random flips
-        sample = self._random_apply(self._hedaugm, sample, p=1)
+
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
         
         # Randomly apply transformation (color distortions) with probability p.
         sample = self._random_apply(self._color_jitter, sample, p=0.8)
         sample = self._random_apply(self._color_drop, sample, p=0.2)
+
+        sample = self._random_apply(self._hedaugm, sample, p=0.7)
 
         return sample
 
@@ -101,59 +103,38 @@ data_augmentation = Sequential([Lambda(CustomAugment())])
 #     return image
 
 # Create TensorFlow dataset
-BATCH_SIZE = 64
+BATCH_SIZE = 256
 
 tp='train'
-train_images = h5py.File('/gpfs/workdir/liashuhamy/camel/raw/pre_8_no_norm_patient_split/camelyonpatch_level_2_split_train_x.h5')['x'][:]
+import tensorflow_io as tfio
+train_images = tfio.IODataset.from_hdf5('/gpfs/workdir/shared/cpm4c/CAMELYON/prepared_datasets/pre_10_vahadane/camelyonpatch_level_2_split_train_x.h5', dataset='/x')
 import numpy as np
 
-if np.max(train_images) > 2:
-    print('norm')
-    train_images = train_images / 255.
-
 import cv2
-new_images = []
-for i in range(train_images.shape[0]):
-  new_images.append(cv2.resize(train_images[i], (256, 256)))
+#new_images = []
+#for i in range(train_images.shape[0]):
+#  new_images.append(cv2.resize(train_images[i], (224, 224)))
 
-train_images = np.array(new_images)
-print(train_images.shape)
+#train_images = np.array(new_images)
+#del new_images[:]
+#new_images = None
+#print(train_images.shape)
 
-#train_labels = h5py.File(f'/content/camelyonpatch_level_2_split_{tp}_y.h5')['y'][:].reshape((-1,1))
+#if np.max(train_images) > 2:
+#    train_images = train_images.astype('float32')
+#    train_images = train_images / 255.
 
-train_ds = tf.data.Dataset.from_tensor_slices(train_images)
+
+train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
+train_ds = train_ds.map(lambda x: tf.image.resize(x, [224,224]))
+train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
 train_ds = (
     train_ds
     .shuffle(1024)
     .batch(BATCH_SIZE, drop_remainder=True)
     .prefetch(tf.data.experimental.AUTOTUNE)
+    
 )
-
-
-# class Generator(nn.Module):
-#
-#     def init(self, nb_filters=64, x_dim=48, z_dim=512):
-#
-#         super(Generator, self).__init__()
-#
-#         self.nb_filters = nb_filters
-#
-#         self.from_rgb_96 = EqualConv2d(3, 2 * nb_filters, 1)
-#
-#         self.enc_96 = ConvBlock(2 * nb_filters, 4 * nb_filters, 3, 1, norm=True)
-#         self.enc_48 = ConvBlock(4 * nb_filters, 8 * nb_filters, 3, 1, norm=True)
-#         self.enc_24 = ConvBlock(8 * nb_filters, 8 * nb_filters, 3, 1, norm=True)
-#         self.enc_12 = ConvBlock(8 * nb_filters, 1 * nb_filters, 3, 1, norm=True)
-#
-#         self.encoder = nn.Sequential(self.enc_96, Downsample(),
-#                                      self.enc_48, Downsample(),
-#                                      self.enc_24, Downsample(),
-#                                      self.enc_12, Downsample())
-#
-#         self.x_dim = x_dim
-#
-#         self.proj = nn.Linear(nb_filters * (x_dim // 2  4)
-#         2, z_dim)
 
 """## Utilities"""
 
@@ -163,40 +144,21 @@ from classification_models.tfkeras import Classifiers
 
 
 # Architecture utils
-def get_resnet_simclr(hidden_1):
-    # ResNet18, preprocess_input = Classifiers.get('resnet18')
-    # base_model =  ResNet18(include_top=False, weights=None, input_shape=(224, 224, 3))
-    # base_model.trainable = True
-    inputs = Input((256, 256, 3))
-    h = Conv2D(64, 3)(inputs)
-    h = MaxPool2D()(h)
-    h = Conv2D(64, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(128, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(128, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(256, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(256, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(512, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(512, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(1024, 3)(h)
-    h = MaxPool2D()(h)
-    h = Conv2D(1024, 3)(h)
-    h = MaxPool2D()(h)
-    h = GlobalAveragePooling2D()(h)
+def get_resnet_simclr(hidden_1, hidden_2, hidden_3):
+    ResNet18, preprocess_input = Classifiers.get('resnet18')
+    base_model =  ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+    base_model.trainable = True
+    inputs = Input((224, 224, 3))
+    h = base_model(inputs, training=True)
+    h = GlobalAveragePooling2D()(h) 
 
     projection_1 = Dense(hidden_1)(h)
-    #projection_1 = Activation("relu")(projection_1)
-    #projection_2 = Dense(hidden_2)(projection_1)
+    projection_1 = Activation("relu")(projection_1)
+    projection_2 = Dense(hidden_2)(projection_1)
     #projection_2 = Activation("relu")(projection_2)
     #projection_3 = Dense(hidden_3)(projection_2)
 
-    resnet_simclr = Model(inputs, projection_1)
+    resnet_simclr = Model(inputs, projection_2)
 
     return resnet_simclr
 
@@ -251,6 +213,7 @@ def train_simclr(model, dataset, optimizer, criterion,
 
     for epoch in tqdm(range(epochs)):
         for image_batch in dataset:
+            #print(image_batch)
             a = data_augmentation(image_batch)
             # print(a.shape)
             b = data_augmentation(image_batch)
@@ -263,26 +226,31 @@ def train_simclr(model, dataset, optimizer, criterion,
         
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-            model.save('model_joe_no_norm.h5')
+            model_name = 'model_18_layers2_256_sgd_cc.h5'
+            print(model_name)
+            model.save(model_name)
     return epoch_wise_loss, model
 
 """## Training"""
 
 tf.config.experimental_run_functions_eagerly(True)
+
 criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, 
                                                           reduction=tf.keras.losses.Reduction.SUM)
-decay_steps = 50
+decay_steps = 100000
 lr_decayed_fn = tf.keras.experimental.CosineDecay(
-    initial_learning_rate=0.1, decay_steps=decay_steps)
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)#SGD(lr_decayed_fn)
+    initial_learning_rate=0.01, decay_steps=decay_steps, alpha=0.00001)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
+#optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)#SGD(lr_decayed_fn)
 
-resnet_simclr_2 = get_resnet_simclr(256)
-#resnet_simclr_2.load_weights('model.h5')
+resnet_simclr_2 = get_resnet_simclr(256,256,256)
+resnet_simclr_2.summary()
+resnet_simclr_2.load_weights('model_18_layers2_256_sgd_c.h5')
 
 
 
 epoch_wise_loss, resnet_simclr  = train_simclr(resnet_simclr_2, train_ds, optimizer, criterion,
-                 temperature=0.1, epochs=60)
+                 temperature=0.1, epochs=350)
 
 #with plt.xkcd():
 #    plt.plot(epoch_wise_loss)
