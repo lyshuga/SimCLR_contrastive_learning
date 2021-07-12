@@ -2,7 +2,7 @@
 import tensorflow as tf
 print(tf.__version__)
 import h5py
-
+import tensorflow_addons as tfa
 
 # Other imports
 from tensorflow.keras.layers import *
@@ -33,6 +33,10 @@ class CustomAugment(object):
         # Random flips
 
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
+        # sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
+        sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+        sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+        sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         
         # Randomly apply transformation (color distortions) with probability p.
         sample = self._random_apply(self._color_jitter, sample, p=0.8)
@@ -40,7 +44,37 @@ class CustomAugment(object):
 
         sample = self._random_apply(self._hedaugm, sample, p=0.7)
 
+        sample = self._random_apply(self._cutout, sample, p=0.4)
+
+        sample = self._random_apply(self._gaus_noise, sample, p=0.7)
+        sample = self._random_apply(self._apply_blur, sample, p=0.7)
+
         return sample
+
+    def _gaussian_kernel(self, kernel_size, sigma, n_channels, dtype):
+        x = tf.range(-kernel_size // 2 + 1, kernel_size // 2 + 1, dtype=dtype)
+        g = tf.math.exp(-(tf.pow(x, 2) / (2 * tf.pow(tf.cast(sigma, dtype), 2))))
+        g_norm2d = tf.pow(tf.reduce_sum(g), 2)
+        g_kernel = tf.tensordot(g, g, axes=0) / g_norm2d
+        g_kernel = tf.expand_dims(g_kernel, axis=-1)
+        return tf.expand_dims(tf.tile(g_kernel, (1, 1, n_channels)), axis=-1)
+
+    def _apply_blur(self, sample):
+        blur = self._gaussian_kernel(3, 2, 3, sample.dtype)
+        sample = tf.nn.depthwise_conv2d(sample[None], blur, [1, 1, 1, 1], 'SAME')
+        return sample
+
+    def _gaus_noise(self, sample):
+        noise = tf.random_normal(shape=tf.shape(sample), mean=0.0, stddev=1, dtype=tf.float32)
+        sample = tf.add(sample, noise)
+        return sample
+
+    def _cutout(self, sample):
+        sizes = [50, 60, 80, 90]
+        size = sizes[np.random.randint(0, 4)]
+        cutout_image = tfa.image.random_cutout(tf.expand_dims(sample, 0), (size, size))
+        cutout_image = tf.squeeze(cutout_image)
+        return cutout_image
 
     def _hedaugm(self, inputs):
         epsilon = 3.14159
@@ -126,6 +160,8 @@ import cv2
 
 
 train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
+train_ds = train_ds.map(lambda x: tf.image.stateless_random_crop(
+    x, size=[224, 224, 3], seed=tuple(np.random.randint(0, size=(2), dtype='int32'))))
 train_ds = train_ds.map(lambda x: tf.image.resize(x, [224,224]))
 train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
 train_ds = (
