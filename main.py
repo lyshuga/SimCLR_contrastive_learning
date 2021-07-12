@@ -31,32 +31,27 @@ class CustomAugment(object):
 
     def __call__(self, sample):        
         # Random flips
-        print(sample.shape)
+
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
         # sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
-        print(sample.shape)
+
         
         # Randomly apply transformation (color distortions) with probability p.
         sample = self._random_apply(self._color_jitter, sample, p=0.8)
         sample = self._random_apply(self._color_drop, sample, p=0.2)
 
-        print(sample.shape)
 
         sample = self._random_apply(self._hedaugm, sample, p=0.7)
 
-        print(sample.shape)
 
         sample = self._random_apply(self._cutout, sample, p=0.4)
 
-        print(sample.shape)
 
         sample = self._random_apply(self._gaus_noise, sample, p=0.7)
-        print(sample.shape)
         sample = self._random_apply(self._apply_blur, sample, p=0.7)
-        print(sample.shape)
 
         return sample
 
@@ -169,10 +164,13 @@ import cv2
 
 import sys
 
+mean=[0.485, 0.456, 0.406]
+std=[0.229, 0.224, 0.225]
+
 train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
 train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[224, 224, 3]))
 train_ds = train_ds.map(lambda x: tf.image.resize(x, [224,224]))
-train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
+train_ds = train_ds.map(lambda x: (tf.cast(x,tf.float32) - mean)/std)
 train_ds = (
     train_ds
     .shuffle(1024)
