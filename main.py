@@ -65,7 +65,7 @@ class CustomAugment(object):
         return sample
 
     def _gaus_noise(self, sample):
-        noise = tf.random_normal(shape=tf.shape(sample), mean=0.0, stddev=1, dtype=tf.float32)
+        noise = tf.random.normal(shape=tf.shape(sample), mean=0.0, stddev=1, dtype=tf.float32)
         sample = tf.add(sample, noise)
         return sample
 
@@ -158,10 +158,10 @@ import cv2
 #    train_images = train_images.astype('float32')
 #    train_images = train_images / 255.
 
+import sys
 
 train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
-train_ds = train_ds.map(lambda x: tf.image.stateless_random_crop(
-    x, size=[224, 224, 3], seed=tuple(np.random.randint(0, size=(2), dtype='int32'))))
+train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[224, 224, 3]))
 train_ds = train_ds.map(lambda x: tf.image.resize(x, [224,224]))
 train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
 train_ds = (
@@ -176,13 +176,13 @@ train_ds = (
 
 #from tf2_resnets import models
 
-from classification_models.tfkeras import Classifiers
-
+#from classification_models.tfkeras import Classifiers
+from tensorflow import keras
 
 # Architecture utils
 def get_resnet_simclr(hidden_1, hidden_2, hidden_3):
-    ResNet18, preprocess_input = Classifiers.get('resnet18')
-    base_model =  ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+    #ResNet18, preprocess_input = Classifiers.get('resnet18')
+    base_model = keras.models.load_model('resnet18.h5') #ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
     base_model.trainable = True
     inputs = Input((224, 224, 3))
     h = base_model(inputs, training=True)
@@ -262,7 +262,7 @@ def train_simclr(model, dataset, optimizer, criterion,
         
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-            model_name = 'model_18_layers2_256_sgd_cc.h5'
+            model_name = 'model_18_256_sgd_augm.h5'
             print(model_name)
             model.save(model_name)
     return epoch_wise_loss, model
@@ -281,7 +281,7 @@ optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=T
 
 resnet_simclr_2 = get_resnet_simclr(256,256,256)
 resnet_simclr_2.summary()
-resnet_simclr_2.load_weights('model_18_layers2_256_sgd_c.h5')
+#resnet_simclr_2.load_weights('model_18_layers2_256_sgd_c.h5')
 
 
 
