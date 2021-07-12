@@ -81,7 +81,7 @@ class CustomAugment(object):
     def _cutout(self, sample):
         sizes = [50, 60, 80, 90]
         size = sizes[np.random.randint(0, 4)]
-        cutout_image = tfa.image.random_cutout(tf.expand_dims(sample, 0), (size, size))
+        cutout_image = tfa.image.random_cutout(sample, (size, size))
         cutout_image = tf.squeeze(cutout_image)
         return cutout_image
 
