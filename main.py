@@ -70,7 +70,7 @@ class CustomAugment(object):
 
     def _apply_blur(self, sample):
         blur = self._gaussian_kernel(3, 2, 3, sample.dtype)
-        sample = tf.nn.depthwise_conv2d(sample[None], blur, [1, 1, 1, 1], 'SAME')
+        sample = tf.nn.depthwise_conv2d(sample, blur, [1, 1, 1, 1], 'SAME')
         return sample
 
     def _gaus_noise(self, sample):
