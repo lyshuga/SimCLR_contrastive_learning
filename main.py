@@ -31,23 +31,32 @@ class CustomAugment(object):
 
     def __call__(self, sample):        
         # Random flips
-
+        print(sample.shape)
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
         # sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+        print(sample.shape)
         
         # Randomly apply transformation (color distortions) with probability p.
         sample = self._random_apply(self._color_jitter, sample, p=0.8)
         sample = self._random_apply(self._color_drop, sample, p=0.2)
 
+        print(sample.shape)
+
         sample = self._random_apply(self._hedaugm, sample, p=0.7)
+
+        print(sample.shape)
 
         sample = self._random_apply(self._cutout, sample, p=0.4)
 
+        print(sample.shape)
+
         sample = self._random_apply(self._gaus_noise, sample, p=0.7)
+        print(sample.shape)
         sample = self._random_apply(self._apply_blur, sample, p=0.7)
+        print(sample.shape)
 
         return sample
 
