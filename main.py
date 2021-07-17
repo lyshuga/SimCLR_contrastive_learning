@@ -168,9 +168,11 @@ mean=[0.485, 0.456, 0.406]
 std=[0.229, 0.224, 0.225]
 
 train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
-train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[224, 224, 3]))
-train_ds = train_ds.map(lambda x: tf.image.resize(x, [224,224]))
-train_ds = train_ds.map(lambda x: (tf.cast(x,tf.float32) - mean)/std)
+train_ds = train_ds.map(lambda x: tf.image.resize(x, [128, 128]))
+train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[112, 112, 3]))
+train_ds = train_ds.map(lambda x: tf.image.resize(x, [112,112]))
+train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
+train_ds = train_ds.map(lambda x: (x - mean)/std)
 train_ds = (
     train_ds
     .shuffle(1024)
@@ -253,8 +255,16 @@ def train_simclr(model, dataset, optimizer, criterion,
                  temperature=0.1, epochs=100):
     step_wise_loss = []
     epoch_wise_loss = []
-
+     
+    
+    
     for epoch in tqdm(range(epochs)):
+        #if epoch < 5:
+        #    model.layers[1].trainable = False
+        #else:
+        #    model.layers[1].trainable = True
+        #    for i in range(55):
+        #        model.layers[1].layers[i].trainable = False
         for image_batch in dataset:
             #print(image_batch)
             a = data_augmentation(image_batch)
@@ -269,7 +279,7 @@ def train_simclr(model, dataset, optimizer, criterion,
         
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-            model_name = 'model_18_256_sgd_augm.h5'
+            model_name = 'model_sgd_augm_112_01.h5'
             print(model_name)
             model.save(model_name)
     return epoch_wise_loss, model
@@ -283,12 +293,14 @@ criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True,
 decay_steps = 100000
 lr_decayed_fn = tf.keras.experimental.CosineDecay(
     initial_learning_rate=0.01, decay_steps=decay_steps, alpha=0.00001)
-optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9, nesterov=True)
 #optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)#SGD(lr_decayed_fn)
 
 resnet_simclr_2 = get_resnet_simclr(256,256,256)
 resnet_simclr_2.summary()
-#resnet_simclr_2.load_weights('model_18_layers2_256_sgd_c.h5')
+
+from tensorflow import keras
+#resnet_simclr_2 = keras.models.load_model('model_18_256_sgd_augm_cc.h5')
 
 
 
