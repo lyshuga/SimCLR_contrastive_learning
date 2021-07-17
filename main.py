@@ -145,32 +145,28 @@ BATCH_SIZE = 256
 
 tp='train'
 import tensorflow_io as tfio
-train_images = tfio.IODataset.from_hdf5('/gpfs/workdir/shared/cpm4c/CAMELYON/prepared_datasets/pre_10_vahadane/camelyonpatch_level_2_split_train_x.h5', dataset='/x')
+train_images = tfio.IODataset.from_hdf5('/home/mykola/Projects/HISTO/camelyon/pre_7_macenko_patient_split/camelyonpatch_level_2_split_train_x.h5', dataset='/x')
 import numpy as np
 
-import cv2
-#new_images = []
-#for i in range(train_images.shape[0]):
-#  new_images.append(cv2.resize(train_images[i], (224, 224)))
-
-#train_images = np.array(new_images)
-#del new_images[:]
-#new_images = None
-#print(train_images.shape)
-
-#if np.max(train_images) > 2:
-#    train_images = train_images.astype('float32')
-#    train_images = train_images / 255.
 
 import sys
 
 mean=[0.485, 0.456, 0.406]
 std=[0.229, 0.224, 0.225]
 
-train_ds = train_images#tf.data.Dataset.from_tensor_slices(train_images)
+
+
+train_ds = train_images
+
 train_ds = train_ds.map(lambda x: tf.image.resize(x, [128, 128]))
+# train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.5))
+
+
 train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[112, 112, 3]))
-train_ds = train_ds.map(lambda x: tf.image.resize(x, [112,112]))
+
+# train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.4375))
+
+# train_ds = train_ds.map(lambda x: tf.image.resize(x, [112,112]))
 train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
 train_ds = train_ds.map(lambda x: (x - mean)/std)
 train_ds = (
@@ -191,7 +187,7 @@ from tensorflow import keras
 # Architecture utils
 def get_resnet_simclr(hidden_1, hidden_2, hidden_3):
     #ResNet18, preprocess_input = Classifiers.get('resnet18')
-    base_model = keras.models.load_model('resnet18.h5') #ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+    base_model = keras.models.load_model('resnet18_112.h5') #ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
     base_model.trainable = True
     inputs = Input((224, 224, 3))
     h = base_model(inputs, training=True)
@@ -259,13 +255,14 @@ def train_simclr(model, dataset, optimizer, criterion,
     
     
     for epoch in tqdm(range(epochs)):
-        #if epoch < 5:
-        #    model.layers[1].trainable = False
-        #else:
-        #    model.layers[1].trainable = True
-        #    for i in range(55):
-        #        model.layers[1].layers[i].trainable = False
+        if epoch < 5:
+           model.layers[1].trainable = False
+        else:
+           model.layers[1].trainable = True
+           for i in range(55):
+               model.layers[1].layers[i].trainable = False
         for image_batch in dataset:
+            print(image_batch.shape)
             #print(image_batch)
             a = data_augmentation(image_batch)
             # print(a.shape)
@@ -290,10 +287,10 @@ tf.config.experimental_run_functions_eagerly(True)
 
 criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, 
                                                           reduction=tf.keras.losses.Reduction.SUM)
-decay_steps = 100000
-lr_decayed_fn = tf.keras.experimental.CosineDecay(
-    initial_learning_rate=0.01, decay_steps=decay_steps, alpha=0.00001)
-optimizer = tf.keras.optimizers.SGD(learning_rate=0.1, momentum=0.9, nesterov=True)
+# decay_steps = 100000
+# lr_decayed_fn = tf.keras.experimental.CosineDecay(
+#     initial_learning_rate=0.01, decay_steps=decay_steps, alpha=0.00001)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.9, nesterov=True)
 #optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)#SGD(lr_decayed_fn)
 
 resnet_simclr_2 = get_resnet_simclr(256,256,256)
