@@ -19,4 +19,4 @@ source activate pcamenv
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.conda/envs/pcamenv/lib:$HOME/usr/lib64/
 
 # execution
-python3 -u main.py
+python3 -u main_CRC.py

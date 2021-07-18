@@ -1,5 +1,5 @@
-
 import tensorflow as tf
+
 print(tf.__version__)
 import h5py
 import tensorflow_addons as tfa
@@ -24,12 +24,13 @@ class CustomAugment(object):
         super(CustomAugment, self).__init__()
 
         # M from [1] & https://blog.bham.ac.uk/intellimic/g-landini-software/colour-deconvolution-2/
-        #self.M = tf.constant(np.array([[0.650, 0.704, 0.286], [0.072, 0.990, 0.105], [0.268, 0.570, 0.776]], dtype='float32'))
-        self.M = tf.constant(np.array([[0.651, 0.701, 0.290], [0.269, 0.568, 0.778], [0.633, -0.713, 0.302]], dtype='float32'))
+        # self.M = tf.constant(np.array([[0.650, 0.704, 0.286], [0.072, 0.990, 0.105], [0.268, 0.570, 0.776]], dtype='float32'))
+        self.M = tf.constant(
+            np.array([[0.651, 0.701, 0.290], [0.269, 0.568, 0.778], [0.633, -0.713, 0.302]], dtype='float32'))
         self.RGB2HED = tf.linalg.inv(self.M)
         self.sigma = sigma
 
-    def __call__(self, sample):        
+    def __call__(self, sample):
         # Random flips
 
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
@@ -38,17 +39,13 @@ class CustomAugment(object):
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
 
-        
         # Randomly apply transformation (color distortions) with probability p.
         sample = self._random_apply(self._color_jitter, sample, p=0.8)
         sample = self._random_apply(self._color_drop, sample, p=0.2)
 
-
         sample = self._random_apply(self._hedaugm, sample, p=0.7)
 
-
         sample = self._random_apply(self._cutout, sample, p=0.4)
-
 
         sample = self._random_apply(self._gaus_noise, sample, p=0.7)
         sample = self._random_apply(self._apply_blur, sample, p=0.7)
@@ -85,46 +82,47 @@ class CustomAugment(object):
         input_shape = inputs.shape
 
         # Reshaped images P \in R^(bs,N,3)
-        P = tf.cast(tf.reshape(inputs, [-1,input_shape[1]*input_shape[2],3]),tf.float32)
-        
+        P = tf.cast(tf.reshape(inputs, [-1, input_shape[1] * input_shape[2], 3]), tf.float32)
+
         # HED images
-        S = tf.matmul(-tf.math.log(P+epsilon), self.RGB2HED)
-        
+        S = tf.matmul(-tf.math.log(P + epsilon), self.RGB2HED)
+
         # Channel-wise pertubations
-        alpha = tf.random.normal([tf.shape(inputs)[0],1,3], mean=1, stddev=self.sigma)
-        beta = tf.random.normal([tf.shape(inputs)[0],1,3], mean=0, stddev=self.sigma)
-        Shat = alpha*S + beta
+        alpha = tf.random.normal([tf.shape(inputs)[0], 1, 3], mean=1, stddev=self.sigma)
+        beta = tf.random.normal([tf.shape(inputs)[0], 1, 3], mean=0, stddev=self.sigma)
+        Shat = alpha * S + beta
 
         # Augmented RGB images
-        Phat = tf.math.exp(-tf.matmul(Shat,self.M))-epsilon
+        Phat = tf.math.exp(-tf.matmul(Shat, self.M)) - epsilon
 
         # Clip values to range [0, 255]
         Phat_clipped = tf.clip_by_value(Phat, clip_value_min=0.0, clip_value_max=255.)
         Phat_uint8 = tf.cast(Phat_clipped, tf.uint8)
 
-        return tf.reshape(Phat_clipped, [-1,input_shape[1],input_shape[2],3])
+        return tf.reshape(Phat_clipped, [-1, input_shape[1], input_shape[2], 3])
 
     def _color_jitter(self, x, s=1):
         # one can also shuffle the order of following augmentations
         # each time they are applied.
-        x = tf.image.random_brightness(x, max_delta=0.8*s)
-        x = tf.image.random_contrast(x, lower=1-0.8*s, upper=1+0.8*s)
-        x = tf.image.random_saturation(x, lower=1-0.8*s, upper=1+0.8*s)
-        x = tf.image.random_hue(x, max_delta=0.2*s)
+        x = tf.image.random_brightness(x, max_delta=0.8 * s)
+        x = tf.image.random_contrast(x, lower=1 - 0.8 * s, upper=1 + 0.8 * s)
+        x = tf.image.random_saturation(x, lower=1 - 0.8 * s, upper=1 + 0.8 * s)
+        x = tf.image.random_hue(x, max_delta=0.2 * s)
         x = tf.clip_by_value(x, 0, 1)
         return x
-    
+
     def _color_drop(self, x):
         x = tf.image.rgb_to_grayscale(x)
         x = tf.tile(x, [1, 1, 1, 3])
         return x
-    
+
     def _random_apply(self, func, x, p):
         return tf.cond(
-          tf.less(tf.random.uniform([], minval=0, maxval=1, dtype=tf.float32),
-                  tf.cast(p, tf.float32)),
-          lambda: func(x),
-          lambda: x)
+            tf.less(tf.random.uniform([], minval=0, maxval=1, dtype=tf.float32),
+                    tf.cast(p, tf.float32)),
+            lambda: func(x),
+            lambda: x)
+
 
 # Build the augmentation pipeline
 data_augmentation = Sequential([Lambda(CustomAugment())])
@@ -143,61 +141,58 @@ data_augmentation = Sequential([Lambda(CustomAugment())])
 # Create TensorFlow dataset
 BATCH_SIZE = 256
 
-tp='train'
+tp = 'train'
 import tensorflow_io as tfio
-# train_images = tfio.IODataset.from_hdf5('/home/mykola/Projects/HISTO/camelyon/pre_7_macenko_patient_split/camelyonpatch_level_2_split_train_x.h5', dataset='/x')
 import numpy as np
-
 
 import sys
 
-mean=[0.485, 0.456, 0.406]
-std=[0.229, 0.224, 0.225]
-
-
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
 
 train_ds = tf.data.Dataset.list_files("/workdir/shared/cpm4c/CRC/NCT-CRC-HE-100K/**/*.tif")
 
 # train_ds = train_ds.map(lambda x: tf.image.resize(x, [128, 128]))
 train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.5))
 
-
 train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[112, 112, 3]))
 
 # train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.4375))
 
-# train_ds = train_ds.map(lambda x: tf.image.resize(x, [112,112]))
-train_ds = train_ds.map(lambda x: tf.cast(x,tf.float32)/255.)
-train_ds = train_ds.map(lambda x: (x - mean)/std)
+
+train_ds = train_ds.map(lambda x: tf.cast(x, tf.float32) / 255.)
+train_ds = train_ds.map(lambda x: (x - mean) / std)
 train_ds = (
     train_ds
-    .shuffle(1024)
-    .batch(BATCH_SIZE, drop_remainder=True)
-    .prefetch(tf.data.experimental.AUTOTUNE)
-    
+        .shuffle(1024)
+        .batch(BATCH_SIZE, drop_remainder=True)
+        .prefetch(tf.data.experimental.AUTOTUNE)
+
 )
 
 """## Utilities"""
 
-#from tf2_resnets import models
+# from tf2_resnets import models
 
-#from classification_models.tfkeras import Classifiers
+# from classification_models.tfkeras import Classifiers
 from tensorflow import keras
+
 
 # Architecture utils
 def get_resnet_simclr(hidden_1, hidden_2, hidden_3):
-    #ResNet18, preprocess_input = Classifiers.get('resnet18')
-    base_model = keras.models.load_model('resnet18_112.h5') #ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+    # ResNet18, preprocess_input = Classifiers.get('resnet18')
+    base_model = keras.models.load_model(
+        'resnet18_112.h5')  # ResNet18(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
     base_model.trainable = True
-    inputs = Input((224, 224, 3))
+    inputs = Input((112, 112, 3))
     h = base_model(inputs, training=True)
-    h = GlobalAveragePooling2D()(h) 
+    h = GlobalAveragePooling2D()(h)
 
     projection_1 = Dense(hidden_1)(h)
     projection_1 = Activation("relu")(projection_1)
     projection_2 = Dense(hidden_2)(projection_1)
-    #projection_2 = Activation("relu")(projection_2)
-    #projection_3 = Dense(hidden_3)(projection_2)
+    # projection_2 = Activation("relu")(projection_2)
+    # projection_3 = Dense(hidden_3)(projection_2)
 
     resnet_simclr = Model(inputs, projection_2)
 
@@ -209,6 +204,7 @@ import helpers
 
 # Mask to remove positive examples from the batch of negative samples
 negative_mask = helpers.get_negative_mask(BATCH_SIZE)
+
 
 @tf.function
 def train_step(xis, xjs, model, optimizer, criterion, temperature):
@@ -237,7 +233,7 @@ def train_step(xis, xjs, model, optimizer, criterion, temperature):
             l_neg = tf.reshape(l_neg, (BATCH_SIZE, -1))
             l_neg /= temperature
 
-            logits = tf.concat([l_pos, l_neg], axis=1) 
+            logits = tf.concat([l_pos, l_neg], axis=1)
             loss += criterion(y_pred=logits, y_true=labels)
 
         loss = loss / (2 * BATCH_SIZE)
@@ -247,23 +243,22 @@ def train_step(xis, xjs, model, optimizer, criterion, temperature):
 
     return loss
 
+
 def train_simclr(model, dataset, optimizer, criterion,
                  temperature=0.1, epochs=100):
     step_wise_loss = []
     epoch_wise_loss = []
-     
-    
-    
+
     for epoch in tqdm(range(epochs)):
         if epoch < 5:
-           model.layers[1].trainable = False
+            model.layers[1].trainable = False
         else:
-           model.layers[1].trainable = True
-           for i in range(55):
-               model.layers[1].layers[i].trainable = False
+            model.layers[1].trainable = True
+            for i in range(55):
+                model.layers[1].layers[i].trainable = False
         for image_batch in dataset:
-            print(image_batch.shape)
-            #print(image_batch)
+            # print(image_batch.shape)
+            # print(image_batch)
             a = data_augmentation(image_batch)
             # print(a.shape)
             b = data_augmentation(image_batch)
@@ -273,42 +268,40 @@ def train_simclr(model, dataset, optimizer, criterion,
 
         epoch_wise_loss.append(np.mean(step_wise_loss))
         # wandb.log({"nt_xentloss": np.mean(step_wise_loss)})
-        
+
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-            model_name = 'model_sgd_augm_112_01.h5'
+            model_name = 'model_sgd_augm_112_rndcntrcrop.h5'
             print(model_name)
             model.save(model_name)
     return epoch_wise_loss, model
+
 
 """## Training"""
 
 tf.config.experimental_run_functions_eagerly(True)
 
-criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, 
+criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True,
                                                           reduction=tf.keras.losses.Reduction.SUM)
-# decay_steps = 100000
-# lr_decayed_fn = tf.keras.experimental.CosineDecay(
-#     initial_learning_rate=0.01, decay_steps=decay_steps, alpha=0.00001)
-optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.9, nesterov=True)
-#optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)#SGD(lr_decayed_fn)
 
-resnet_simclr_2 = get_resnet_simclr(256,256,256)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.9, nesterov=True)
+
+resnet_simclr_2 = get_resnet_simclr(256, 256, 256)
 resnet_simclr_2.summary()
 
 from tensorflow import keras
-#resnet_simclr_2 = keras.models.load_model('model_18_256_sgd_augm_cc.h5')
+
+# resnet_simclr_2 = keras.models.load_model('model_18_256_sgd_augm_cc.h5')
 
 
+epoch_wise_loss, resnet_simclr = train_simclr(resnet_simclr_2, train_ds, optimizer, criterion,
+                                              temperature=0.1, epochs=350)
 
-epoch_wise_loss, resnet_simclr  = train_simclr(resnet_simclr_2, train_ds, optimizer, criterion,
-                 temperature=0.1, epochs=350)
-
-#with plt.xkcd():
+# with plt.xkcd():
 #    plt.plot(epoch_wise_loss)
 #    plt.title("tau = 0.1, h1 = 256, h2 = 128, h3 = 50")
 #    plt.show()
 
-#resnet_simclr_2.summary()
+# resnet_simclr_2.summary()
 
 
