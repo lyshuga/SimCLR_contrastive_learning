@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=clr
+#SBATCH --job-name=CRC_clr
 #SBATCH --output=%x_%j.out
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu
-#SBATCH --mem=26000
+#SBATCH --mem=80000
 
 # Load modules
 unset LD_LIBRARY_PATH

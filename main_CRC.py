@@ -19,6 +19,120 @@ tf.random.set_seed(666)
 np.random.seed(666)
 
 
+mean=[0.485, 0.456, 0.406]
+std=[0.229, 0.224, 0.225]
+
+# class CustomAugment(object):
+#     def __init__(self, sigma=0.4):
+#         super(CustomAugment, self).__init__()
+
+#         # M from [1] & https://blog.bham.ac.uk/intellimic/g-landini-software/colour-deconvolution-2/
+#         #self.M = tf.constant(np.array([[0.650, 0.704, 0.286], [0.072, 0.990, 0.105], [0.268, 0.570, 0.776]], dtype='float32'))
+#         self.M = tf.constant(np.array([[0.651, 0.701, 0.290], [0.269, 0.568, 0.778], [0.633, -0.713, 0.302]], dtype='float32'))
+#         self.RGB2HED = tf.linalg.inv(self.M)
+#         self.sigma = sigma
+
+#     def __call__(self, sample):        
+#         # Random flips
+        
+#         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
+#         # sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
+#         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+#         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+#         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
+        
+#         # Randomly apply transformation (color distortions) with probability p.
+#         sample = self._random_apply(self._color_jitter, sample, p=0.8)
+#         sample = self._random_apply(self._color_drop, sample, p=0.4)
+
+#         sample = self._random_apply(self._hedaugm, sample, p=0.8)
+
+
+#         sample = self._random_apply(self._cutout, sample, p=0.7)
+
+
+#         sample = self._random_apply(self._gaus_noise, sample, p=0.9)
+#         sample = self._random_apply(self._apply_blur, sample, p=0.8)
+        
+#         sample = self._random_apply(self._clip, sample, p=1)
+#         sample = (sample - mean) / std
+        
+#         return sample
+
+#     def _gaussian_kernel(self, kernel_size, sigma, n_channels, dtype):
+#         x = tf.range(-kernel_size // 2 + 1, kernel_size // 2 + 1, dtype=dtype)
+#         g = tf.math.exp(-(tf.pow(x, 2) / (2 * tf.pow(tf.cast(sigma, dtype), 2))))
+#         g_norm2d = tf.pow(tf.reduce_sum(g), 2)
+#         g_kernel = tf.tensordot(g, g, axes=0) / g_norm2d
+#         g_kernel = tf.expand_dims(g_kernel, axis=-1)
+#         return tf.expand_dims(tf.tile(g_kernel, (1, 1, n_channels)), axis=-1)
+
+#     def _apply_blur(self, sample):
+#         blur = self._gaussian_kernel(5, 2, 3, sample.dtype)
+#         sample = tf.nn.depthwise_conv2d(sample, blur, [1, 1, 1, 1], 'SAME')
+#         return sample
+
+#     def _gaus_noise(self, sample):
+#         noise = tf.random.normal(shape=tf.shape(sample), mean=0.0, stddev=1, dtype=tf.float32)
+#         sample = tf.add(sample, noise)
+#         return sample
+
+#     def _cutout(self, sample):
+#         sizes = [50, 60, 80, 90]
+#         size = sizes[np.random.randint(0, 4)]
+#         cutout_image = tfa.image.random_cutout(sample, (size, size))
+#         cutout_image = tf.squeeze(cutout_image)
+#         return cutout_image
+
+#     def _clip(self, inputs):
+#         return tf.clip_by_value(inputs, clip_value_min=0.0, clip_value_max=1.)
+    
+#     def _hedaugm(self, inputs):
+#         epsilon = 3.14159
+#         input_shape = inputs.shape
+
+#         # Reshaped images P \in R^(bs,N,3)
+#         P = tf.cast(tf.reshape(inputs, [-1,input_shape[1]*input_shape[2],3]),tf.float32)
+        
+#         # HED images
+#         S = tf.matmul(-tf.math.log(P+epsilon), self.RGB2HED)
+        
+#         # Channel-wise pertubations
+#         alpha = tf.random.normal([tf.shape(inputs)[0],1,3], mean=1, stddev=self.sigma)
+#         beta = tf.random.normal([tf.shape(inputs)[0],1,3], mean=0, stddev=self.sigma)
+#         Shat = alpha*S + beta
+
+#         # Augmented RGB images
+#         Phat = tf.math.exp(-tf.matmul(Shat,self.M))-epsilon
+
+#         # Clip values to range [0, 255]
+#         Phat_clipped = Phat#tf.clip_by_value(Phat, clip_value_min=0.0, clip_value_max=1.)
+# #         Phat_uint8 = tf.cast(Phat_clipped, tf.uint8)
+
+#         return tf.reshape(Phat_clipped, [-1,input_shape[1],input_shape[2],3])
+
+#     def _color_jitter(self, x, s=1):
+#         # one can also shuffle the order of following augmentations
+#         # each time they are applied.
+#         x = tf.image.random_brightness(x, max_delta=0.9*s)
+#         x = tf.image.random_contrast(x, lower=1-0.9*s, upper=1+0.9*s)
+#         x = tf.image.random_saturation(x, lower=1-0.9*s, upper=1+0.9*s)
+#         x = tf.image.random_hue(x, max_delta=0.5*s)
+#         x = tf.clip_by_value(x, 0, 1)
+#         return x
+    
+#     def _color_drop(self, x):
+#         x = tf.image.rgb_to_grayscale(x)
+#         x = tf.tile(x, [1, 1, 1, 3])
+#         return x
+    
+#     def _random_apply(self, func, x, p):
+#         return tf.cond(
+#           tf.less(tf.random.uniform([], minval=0, maxval=1, dtype=tf.float32),
+#                   tf.cast(p, tf.float32)),
+#           lambda: func(x),
+#           lambda: x)
+
 class CustomAugment(object):
     def __init__(self, sigma=0.25):
         super(CustomAugment, self).__init__()
@@ -32,9 +146,13 @@ class CustomAugment(object):
 
     def __call__(self, sample):
         # Random flips
-
+        
+        #sample = self._random_apply(self._random_crop, sample, p=0.6)
+        
         sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
-        # sample = self._random_apply(tf.image.flip_left_right, sample, p=0.5)
+        
+#         sample = self._random_apply(self._rotate, sample, p=0.5)
+        
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
         sample = self._random_apply(tf.image.rot90, sample, p=0.5)
@@ -51,7 +169,15 @@ class CustomAugment(object):
         sample = self._random_apply(self._apply_blur, sample, p=0.7)
 
         return sample
-
+    
+    def _rotate(self, sample):
+        its = np.random.randint(1, 4)
+        for i in range(its):
+            sample = tf.image.rot90(sample)
+            
+        return sample
+        
+    
     def _gaussian_kernel(self, kernel_size, sigma, n_channels, dtype):
         x = tf.range(-kernel_size // 2 + 1, kernel_size // 2 + 1, dtype=dtype)
         g = tf.math.exp(-(tf.pow(x, 2) / (2 * tf.pow(tf.cast(sigma, dtype), 2))))
@@ -76,7 +202,13 @@ class CustomAugment(object):
         cutout_image = tfa.image.random_cutout(sample, (size, size))
         cutout_image = tf.squeeze(cutout_image)
         return cutout_image
-
+    
+    def _random_crop(self, sample):
+        print(sample.shape)
+        sample = tf.image.random_crop(sample, size=[98, 98, 3])
+        sample = tf.image.resize(sample, [112, 112])
+        return sample
+    
     def _hedaugm(self, inputs):
         epsilon = 3.14159
         input_shape = inputs.shape
@@ -144,20 +276,57 @@ BATCH_SIZE = 256
 tp = 'train'
 import tensorflow_io as tfio
 import numpy as np
-
+import glob
 import sys
 
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
-train_ds = tf.data.Dataset.list_files("/workdir/shared/cpm4c/CRC/NCT-CRC-HE-100K/**/*.tif")
 
-# train_ds = train_ds.map(lambda x: tf.image.resize(x, [128, 128]))
+
+def parse_image(filename):
+
+    image = tf.io.read_file(filename)
+
+    image = tfio.experimental.image.decode_tiff(image)
+    image = image[:,:,:3]
+
+
+#     print(image)
+    return image
+    
+ls = glob.glob("/workdir/shared/cpm4c/CRC/NCT-CRC-HE-100K/**/*.tif")
+data = np.array([parse_image(l) for l in tqdm(ls)])
+
+train_ds = tf.data.Dataset.from_tensor_slices(data)
+
+
+# def parse_image(filename):
+#     image = tf.io.read_file(filename)
+#     image = tfio.experimental.image.decode_tiff(image)
+#     #image = tf.image.convert_image_dtype(image, tf.float32)
+#     #image = tf.image.resize(image, [224, 224])
+#     image = image[:,:,:3]
+#     return image
+
+def apply_random_crop(sample):
+    thr = 0.4
+    pred = np.random.uniform(low=0.0, high=1.0, size=1)[0]
+    if pred < thr: 
+        sample = tf.image.random_crop(sample, size=[98, 98, 3])
+        sample =  tf.image.resize(sample, [112, 112])
+    return sample
+
+# train_ds = train_ds.map(parse_image)
+
+train_ds = train_ds.map(lambda x: tf.image.resize(x, [224, 224]))
 train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.5))
 
-train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[112, 112, 3]))
+train_ds = train_ds.map(lambda x: apply_random_crop(x))
 
-# train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.4375))
+# train_ds = train_ds.map(lambda x: tf.image.random_crop(x, size=[112, 112, 3]))
+
+# train_ds = train_ds.map(lambda x: tf.image.central_crop(x, 0.5))
 
 
 train_ds = train_ds.map(lambda x: tf.cast(x, tf.float32) / 255.)
@@ -250,7 +419,7 @@ def train_simclr(model, dataset, optimizer, criterion,
     epoch_wise_loss = []
 
     for epoch in tqdm(range(epochs)):
-        if epoch < 5:
+        if epoch < 0:
             model.layers[1].trainable = False
         else:
             model.layers[1].trainable = True
@@ -271,7 +440,7 @@ def train_simclr(model, dataset, optimizer, criterion,
 
         if epoch % 1 == 0 or True:
             print("epoch: {} loss: {:.3f}".format(epoch + 1, np.mean(step_wise_loss)))
-            model_name = 'model_sgd_augm_112_rndcntrcrop.h5'
+            model_name = 'final2/CRC_center_crop_001_cc.h5'
             print(model_name)
             model.save(model_name)
     return epoch_wise_loss, model
@@ -284,14 +453,14 @@ tf.config.experimental_run_functions_eagerly(True)
 criterion = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True,
                                                           reduction=tf.keras.losses.Reduction.SUM)
 
-optimizer = tf.keras.optimizers.SGD(learning_rate=0.0001, momentum=0.9, nesterov=True)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True)
 
 resnet_simclr_2 = get_resnet_simclr(256, 256, 256)
 resnet_simclr_2.summary()
 
 from tensorflow import keras
 
-# resnet_simclr_2 = keras.models.load_model('model_18_256_sgd_augm_cc.h5')
+resnet_simclr_2 = keras.models.load_model('final2/CRC_center_crop_001_c.h5')
 
 
 epoch_wise_loss, resnet_simclr = train_simclr(resnet_simclr_2, train_ds, optimizer, criterion,
